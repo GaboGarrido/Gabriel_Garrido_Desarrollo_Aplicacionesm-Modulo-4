@@ -1,0 +1,29 @@
+body { background: #f8f9fa; }
+.card { box-shadow: 0 6px 18px rgba(0,0,0,0.06); }
+.navbar-brand { font-weight: 600; }
+.list-group-item { font-size: 0.95rem; }
+
+/* Chart container to limit chart size to a medium box */
+.chart-container {
+	height: 320px;
+	max-width: 100%;
+	padding: 8px;
+}
+.chart-container canvas {
+	width: 100% !important;
+	height: 100% !important;
+}
+
+/* Alerts */
+.app-alerts { position: fixed; top: 1rem; right: 1rem; z-index: 2000; width: 320px; }
+.app-alert { margin-bottom: 0.5rem; }
+
+/* Tables: compact and readable */
+.table-sm td, .table-sm th { vertical-align: middle; }
+
+/* Make cards visually lighter */
+.card { border-radius: 8px; }
+
+@media (max-width: 768px){
+	.chart-container { height: 220px; }
+}

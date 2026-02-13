@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Galileo - Control de Ventas</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/sales/css/style.css">
+  </head>
+  <body>
+    <nav class="navbar navbar-dark bg-primary mb-4">
+      <div class="container-fluid">
+        <span class="navbar-brand mb-0 h1">Galileo - Control de Ventas</span>
+      </div>
+    </nav>
+
+    <div class="container">
+      <div class="app-alerts" id="app-alerts"></div>
+      <div class="row mb-4">
+        <div class="col-md-4">
+          <div class="card text-center p-3">
+            <h6 class="text-muted">Total Ventas</h6>
+            <h3 id="total-sales-amount">$0.00</h3>
+            <small id="total-sales-count">0 transacciones</small>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card text-center p-3">
+            <h6 class="text-muted">Productos Vendidos</h6>
+            <h3 id="total-products-sold">0</h3>
+            <small>Unidades totales</small>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card text-center p-3">
+            <h6 class="text-muted">Productos Top</h6>
+            <ol id="top-products-list" class="mb-0"></ol>
+          </div>
+        </div>
+      </div>
+
+      <div class="row mb-3">
+        <div class="col-12">
+          <div class="alert alert-warning" id="low-stock-alert" style="display:none">
+            <strong>Productos con bajo stock:</strong>
+            <ul id="low-stock-list" class="mb-0"></ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-lg-6">
+          <div class="card mb-3">
+            <div class="card-body">
+              <h5 class="card-title">Agregar Venta</h5>
+              <form id="sale-form">
+                {% csrf_token %}
+                <div class="mb-2">
+                  <label class="form-label">Cliente</label>
+                  <select id="customer-select" class="form-select"></select>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label">O escriba nombre del cliente (creará nuevo si no existe)</label>
+                  <input class="form-control" id="customer-manual" placeholder="Nombre cliente (manual)">
+                </div>
+                <div id="new-customer-fields" style="display:none">
+                  <div class="mb-2">
+                    <label class="form-label">Nombre (nuevo cliente)</label>
+                    <input class="form-control" id="customer-name" placeholder="Nombre cliente">
+                  </div>
+                  <div class="mb-2">
+                    <label class="form-label">Email (nuevo cliente)</label>
+                    <input class="form-control" id="customer-email" placeholder="email@ejemplo.com">
+                  </div>
+                </div>
+
+                <div class="mb-2">
+                  <label class="form-label">Producto</label>
+                  <select id="product-select" class="form-select"></select>
+                </div>
+                <div id="new-product-fields" style="display:none">
+                  <div class="mb-2">
+                    <label class="form-label">Nombre (nuevo producto)</label>
+                    <input class="form-control" id="product-name" placeholder="Nombre producto">
+                  </div>
+                  <div class="mb-2">
+                    <label class="form-label">Precio (nuevo producto)</label>
+                    <input class="form-control" id="product-price" type="number" step="0.01">
+                  </div>
+                </div>
+
+                <div class="mb-2">
+                  <label class="form-label">Precio seleccionado</label>
+                  <div>
+                    <span id="product-price-display">$0.00</span> — <small>Stock: <span id="product-stock-display">0</span></small>
+                  </div>
+                </div>
+
+                <div class="mb-2">
+                  <label class="form-label">Precio de venta (editar si varía)</label>
+                  <input id="sale-unit-price" class="form-control" type="number" step="0.01" value="0.00">
+                </div>
+
+                <div class="mb-2">
+                  <label class="form-label">Cantidad</label>
+                  <input class="form-control" id="quantity" type="number" value="1" min="1" required>
+                </div>
+                <button class="btn btn-success" type="submit">Guardar Venta</button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-6">
+          <h5>Ventas Recientes</h5>
+          <div class="card mb-3 p-2">
+            <div class="table-responsive">
+              <table class="table table-sm mb-0">
+                <thead><tr><th>Fecha</th><th>Producto</th><th>Cliente</th><th>Cantidad</th><th>Total</th></tr></thead>
+                <tbody id="sales-table-body"></tbody>
+              </table>
+            </div>
+            <div class="d-flex justify-content-between p-2">
+              <div>
+                <button id="sales-prev" class="btn btn-sm btn-outline-secondary">Anterior</button>
+                <button id="sales-next" class="btn btn-sm btn-outline-secondary">Siguiente</button>
+              </div>
+              <small id="sales-page-info" class="text-muted align-self-center"></small>
+            </div>
+          </div>
+
+          <div class="card mb-3 p-2">
+            <h6 class="mb-2">Productos Top</h6>
+            <div class="chart-container">
+              <canvas id="topProductsChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr>
+      <div class="row mt-3">
+        <div class="col-md-6">
+          <div class="card mb-3">
+              <div class="card-body">
+                {% csrf_token %}
+              <h5 class="card-title">Gestión de Inventario</h5>
+              <div class="mb-2">
+                <label class="form-label">Producto (seleccionar)</label>
+                <select id="inv-product" class="form-select"></select>
+              </div>
+              <div class="mb-2">
+                <label class="form-label">Cantidad</label>
+                <input id="inv-quantity" class="form-control" type="number" value="1" min="1">
+              </div>
+              <div class="mb-2">
+                <label class="form-label">Tipo</label>
+                <select id="inv-type" class="form-select"><option value="IN">Entrada</option><option value="OUT">Salida</option></select>
+              </div>
+              <div class="mb-2">
+                <label class="form-label">Nota</label>
+                <input id="inv-note" class="form-control" type="text">
+              </div>
+              <button id="inv-submit" class="btn btn-primary">Registrar Movimiento</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <div class="card mb-3">
+              <div class="card-body">
+                {% csrf_token %}
+              <h5 class="card-title">Agregar Producto (Inventario)</h5>
+              <div class="mb-2">
+                <label class="form-label">Nombre</label>
+                <input id="add-product-name" class="form-control" type="text" placeholder="Nombre del producto">
+              </div>
+              <div class="mb-2">
+                <label class="form-label">Precio</label>
+                <input id="add-product-price" class="form-control" type="number" step="0.01" value="0.00">
+              </div>
+              <div class="mb-2">
+                <label class="form-label">Stock inicial</label>
+                <input id="add-product-stock" class="form-control" type="number" value="0">
+              </div>
+              <div class="mb-2">
+                <label class="form-label">Umbral de reposición</label>
+                <input id="add-product-reorder" class="form-control" type="number" value="5">
+              </div>
+              <button id="inv-add-product" class="btn btn-success">Agregar Producto</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <h5>Productos (Inventario)</h5>
+          <div class="card p-2 mb-3">
+            <div class="table-responsive">
+              <table class="table table-sm mb-0">
+                <thead><tr><th>Producto</th><th>Precio</th><th>Stock</th><th>Umbral</th></tr></thead>
+                <tbody id="products-inventory-list"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card p-2">
+            <h6>Movimientos de Inventario</h6>
+            <div class="table-responsive">
+              <table class="table table-sm mb-0">
+                <thead><tr><th>Fecha</th><th>Producto</th><th>Tipo</th><th>Cantidad</th><th>Nota</th></tr></thead>
+                <tbody id="inventory-table-body"></tbody>
+              </table>
+            </div>
+            <div class="d-flex justify-content-between p-2">
+              <div>
+                <button id="inv-prev" class="btn btn-sm btn-outline-secondary">Anterior</button>
+                <button id="inv-next" class="btn btn-sm btn-outline-secondary">Siguiente</button>
+              </div>
+              <small id="inv-page-info" class="text-muted align-self-center"></small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+    // UI helpers
+    function showMessage(type, text, timeout=4000){
+      const container = document.getElementById('app-alerts');
+      const div = document.createElement('div');
+      div.className = `alert alert-${type} app-alert`;
+      div.role = 'alert';
+      div.innerText = text;
+      container.appendChild(div);
+      setTimeout(()=>{ div.remove(); }, timeout);
+    }
+
+    function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim();
+          if (cookie.substring(0, name.length + 1) === (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
+
+    const CSRFTOKEN = getCookie('csrftoken');
+
+    async function loadDashboard(){
+      const res = await fetch('/api/dashboard/');
+      const d = await res.json();
+      document.getElementById('total-sales-amount').innerText = `$${d.total_sales_amount}`;
+      document.getElementById('total-sales-count').innerText = `${d.total_sales_count} transacciones`;
+      document.getElementById('total-products-sold').innerText = d.total_products_sold;
+
+      const topList = document.getElementById('top-products-list');
+      topList.innerHTML = '';
+      const labels = [];
+      const qtys = [];
+      d.top_products.forEach(p => {
+        const li = document.createElement('li');
+        li.innerText = `${p.name} — ${p.total_qty} uds ($${p.revenue})`;
+        topList.appendChild(li);
+        labels.push(p.name);
+        qtys.push(p.total_qty);
+      });
+
+      // chart
+      const ctx = document.getElementById('topProductsChart').getContext('2d');
+      if(window.topChart) window.topChart.destroy();
+      window.topChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [{ label: 'Unidades vendidas', data: qtys, backgroundColor: 'rgba(13,110,253,0.7)'}] },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+    }
+
+    // sales pagination state
+    let salesPage = 1, salesPageSize = 10, salesHasNext=false, salesHasPrev=false;
+    async function loadSales(page=1){
+      salesPage = page;
+      const res = await fetch(`/api/sales/?page=${page}`);
+      const data = await res.json();
+      const tbody = document.getElementById('sales-table-body');
+      tbody.innerHTML = '';
+      (data.results || data).forEach(s => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${new Date(s.created_at).toLocaleString()}</td><td>${s.product.name}</td><td>${s.customer.name}</td><td>${s.quantity}</td><td>$${s.total}</td>`;
+        tbody.appendChild(tr);
+      });
+      salesHasNext = !!data.next; salesHasPrev = !!data.previous;
+      document.getElementById('sales-next').disabled = !salesHasNext;
+      document.getElementById('sales-prev').disabled = !salesHasPrev;
+      document.getElementById('sales-page-info').innerText = `Página ${page}`;
+    }
+
+    // populate customer and product selects
+    async function loadCustomers(){
+      const res = await fetch('/api/customers/');
+      const data = await res.json();
+      const sel = document.getElementById('customer-select');
+      sel.innerHTML = '';
+      const optNew = document.createElement('option'); optNew.value = 'NEW'; optNew.text='-- Nuevo cliente --'; sel.appendChild(optNew);
+      data.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.text = c.name; sel.appendChild(o); });
+    }
+
+    async function loadProductsForSelect(){
+      const res = await fetch('/api/products/');
+      const data = await res.json();
+      const items = data.results || data;
+      const sel = document.getElementById('product-select');
+      sel.innerHTML = '';
+      const optNew = document.createElement('option'); optNew.value = 'NEW'; optNew.text='-- Nuevo producto --'; sel.appendChild(optNew);
+      items.forEach(p => { const o = document.createElement('option'); o.value = p.id; o.text = p.name; o.dataset.price = p.price; o.dataset.stock = p.stock; sel.appendChild(o); });
+    }
+
+    document.getElementById('customer-select').addEventListener('change', (e)=>{
+      const v = e.target.value; const newFields = document.getElementById('new-customer-fields');
+      newFields.style.display = (v==='NEW')? 'block':'none';
+    });
+
+    document.getElementById('product-select').addEventListener('change', (e)=>{
+      const v = e.target.value; const newFields = document.getElementById('new-product-fields');
+      newFields.style.display = (v==='NEW')? 'block':'none';
+      const priceDisplay = document.getElementById('product-price-display');
+      const stockDisplay = document.getElementById('product-stock-display');
+      if(v==='NEW'){ priceDisplay.innerText = '$0.00'; stockDisplay.innerText='-'; document.getElementById('sale-unit-price').value = '0.00'; }
+      else{
+        const opt = e.target.selectedOptions[0];
+        priceDisplay.innerText = `$${opt.dataset.price}`;
+        stockDisplay.innerText = opt.dataset.stock;
+        document.getElementById('sale-unit-price').value = opt.dataset.price;
+      }
+    });
+
+    document.getElementById('sale-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const manualName = document.getElementById('customer-manual').value.trim();
+      const customerSel = document.getElementById('customer-select').value;
+      let customerPayload;
+      if(manualName){
+        customerPayload = { name: manualName };
+      } else if(customerSel === 'NEW'){
+        customerPayload = { name: document.getElementById('customer-name').value, email: document.getElementById('customer-email').value };
+      } else {
+        customerPayload = customerSel; // send id
+      }
+
+      const productSel = document.getElementById('product-select').value;
+      let productPayload;
+      if(productSel === 'NEW'){
+        productPayload = { name: document.getElementById('product-name').value, price: parseFloat(document.getElementById('product-price').value || 0) };
+      } else {
+        productPayload = parseInt(productSel, 10);
+      }
+
+      const quantity = parseInt(document.getElementById('quantity').value, 10);
+      const unit_price = parseFloat(document.getElementById('sale-unit-price').value || 0);
+
+      const res = await fetch('/api/sales/', {
+        method: 'POST', headers: {'Content-Type':'application/json', 'X-CSRFToken': CSRFTOKEN}, body: JSON.stringify({ customer: customerPayload, product: productPayload, quantity, unit_price })
+      });
+      if(!res.ok){ const j=await res.json(); alert('Error: '+(j.detail||res.statusText)); return; }
+      document.getElementById('sale-form').reset();
+      await Promise.all([loadSales(), loadDashboard(), loadProductsInventory(), loadProductsForSelect(), loadCustomers()]);
+    });
+
+    // initial population
+    loadCustomers();
+    loadProductsForSelect();
+
+    loadSales();
+    loadDashboard();
+    // inventory helpers
+    // inventory pagination state
+    let invPage = 1, invHasNext=false, invHasPrev=false;
+
+    async function loadInventoryTransactions(page=1){
+      invPage = page;
+      const res = await fetch(`/api/inventory/?page=${page}`);
+      const data = await res.json();
+      const tbody = document.getElementById('inventory-table-body');
+      tbody.innerHTML = '';
+      (data.results || data).forEach(it => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${new Date(it.created_at).toLocaleString()}</td><td>${it.product.name}</td><td>${it.type}</td><td>${it.quantity}</td><td>${it.note||''}</td>`;
+        tbody.appendChild(tr);
+      });
+      invHasNext = !!data.next; invHasPrev = !!data.previous;
+      document.getElementById('inv-next').disabled = !invHasNext;
+      document.getElementById('inv-prev').disabled = !invHasPrev;
+      document.getElementById('inv-page-info').innerText = `Página ${page}`;
+    }
+
+    async function loadProductsInventory(){
+      const res = await fetch('/api/products/');
+      const data = await res.json();
+      const items = data.results || data;
+      const tbody = document.getElementById('products-inventory-list');
+      const select = document.getElementById('inv-product');
+      tbody.innerHTML = '';
+      select.innerHTML = '';
+      const lowList = document.getElementById('low-stock-list');
+      lowList.innerHTML = '';
+      let lowCount = 0;
+      items.forEach(p => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${p.name}</td><td>$${p.price}</td><td>${p.stock}</td><td>${p.reorder_point||0}</td>`;
+        tbody.appendChild(tr);
+        const opt = document.createElement('option'); opt.value = p.id; opt.text = p.name; select.appendChild(opt);
+        if(p.stock <= (p.reorder_point || 0)){
+          const li = document.createElement('li');
+          li.innerText = `${p.name} — stock: ${p.stock} (umbral: ${p.reorder_point})`;
+          lowList.appendChild(li);
+          lowCount += 1;
+        }
+      });
+      const alert = document.getElementById('low-stock-alert');
+      if(lowCount>0){ alert.style.display='block'; } else { alert.style.display='none'; }
+    }
+
+    document.getElementById('inv-submit').addEventListener('click', async () => {
+      const product = parseInt(document.getElementById('inv-product').value,10);
+      const quantity = parseInt(document.getElementById('inv-quantity').value,10);
+      const type = document.getElementById('inv-type').value;
+      const note = document.getElementById('inv-note').value;
+      const payload = { product, quantity, type, note };
+      const res = await fetch('/api/inventory/', {
+        method: 'POST', headers: {'Content-Type':'application/json', 'X-CSRFToken': CSRFTOKEN}, body: JSON.stringify(payload)
+      });
+      if(!res.ok){ const j=await res.json(); showMessage('danger', 'Error: '+(j.detail||res.statusText)); return; }
+      showMessage('success', 'Movimiento registrado');
+      await Promise.all([loadProductsInventory(), loadDashboard(), loadSales(), loadInventoryTransactions(1)]);
+    });
+
+    // Add product from inventory UI
+    document.getElementById('inv-add-product').addEventListener('click', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('add-product-name').value.trim();
+      const price = parseFloat(document.getElementById('add-product-price').value) || 0;
+      const stock = parseInt(document.getElementById('add-product-stock').value, 10) || 0;
+      const reorder = parseInt(document.getElementById('add-product-reorder').value, 10) || 0;
+      if(!name){ alert('Ingrese el nombre del producto'); return; }
+      const payload = { name, price, stock, reorder_point: reorder };
+      const res = await fetch('/api/products/', { method: 'POST', headers: {'Content-Type':'application/json', 'X-CSRFToken': CSRFTOKEN}, body: JSON.stringify(payload) });
+      if(!res.ok){ const j = await res.json(); showMessage('danger', 'Error al crear producto: ' + (j.detail || res.statusText)); return; }
+      // success
+      showMessage('success','Producto agregado correctamente');
+      await Promise.all([loadProductsInventory(), loadProductsForSelect(), loadDashboard()]);
+      // clear fields
+      document.getElementById('add-product-name').value = '';
+      document.getElementById('add-product-price').value = '0.00';
+      document.getElementById('add-product-stock').value = '0';
+      document.getElementById('add-product-reorder').value = '5';
+      alert('Producto agregado correctamente');
+    });
+
+    // initial loads
+    loadProductsInventory();
+    loadInventoryTransactions(1);
+
+    // pagination controls
+    document.getElementById('sales-prev').addEventListener('click', ()=>{ if(salesHasPrev) loadSales(salesPage-1); });
+    document.getElementById('sales-next').addEventListener('click', ()=>{ if(salesHasNext) loadSales(salesPage+1); });
+    document.getElementById('inv-prev').addEventListener('click', ()=>{ if(invHasPrev) loadInventoryTransactions(invPage-1); });
+    document.getElementById('inv-next').addEventListener('click', ()=>{ if(invHasNext) loadInventoryTransactions(invPage+1); });
+    </script>
+  </body>
+</html>
